@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: user-service-postgres
+    environment:
+      POSTGRES_DB: userdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - user-service-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: user-service-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - user-service-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: user-service-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - user-service-network
+
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    ports:
+      - "8081:8081"
+    environment:
+      - DB_URL=jdbc:postgresql://postgres:5432/userdb
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - JWT_SECRET=your-256-bit-secret-key-here-must-be-at-least-32-characters
+      - JWT_EXPIRATION=86400000
+      - EUREKA_URL=http://localhost:8761/eureka/
+      - ZIPKIN_URL=http://localhost:9411
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - user-service-network
+
+volumes:
+  postgres_data:
+
+networks:
+  user-service-network:
+    driver: bridge
