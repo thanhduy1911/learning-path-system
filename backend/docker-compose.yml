@@ -1,20 +1,59 @@
 version: '3.8'
 
 services:
+  # Database cho user-service
   postgres:
     image: postgres:15-alpine
     container_name: user-service-postgres
     environment:
-      POSTGRES_DB: userdb
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: user_service_db
+      POSTGRES_USER: java_admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - user-service-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U java_admin -d user_service_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
+  # Database cho learning-service (khi cần)
+  # learning-postgres:
+  #   image: postgres:15-alpine
+  #   container_name: learning-service-postgres
+  #   environment:
+  #     POSTGRES_DB: learning_service_db
+  #     POSTGRES_USER: java_admin
+  #     POSTGRES_PASSWORD: admin123
+  #   ports:
+  #     - "5433:5432"  # Port khác để tránh conflict
+  #   volumes:
+  #     - learning_postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - user-service-network
+
+  # Database cho auth-service (khi cần)
+  # auth-postgres:
+  #   image: postgres:15-alpine
+  #   container_name: auth-service-postgres
+  #   environment:
+  #     POSTGRES_DB: auth_service_db
+  #     POSTGRES_USER: java_admin
+  #     POSTGRES_PASSWORD: admin123
+  #   ports:
+  #     - "5434:5432"  # Port khác để tránh conflict
+  #   volumes:
+  #     - auth_postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - user-service-network
+
+  # Redis - dùng chung cho tất cả services
   redis:
     image: redis:7-alpine
     container_name: user-service-redis
@@ -23,6 +62,7 @@ services:
     networks:
       - user-service-network
 
+  # RabbitMQ - dùng chung cho tất cả services
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: user-service-rabbitmq
@@ -35,34 +75,37 @@ services:
     networks:
       - user-service-network
 
-  user-service:
-    build:
-      context: ./user-service
-      dockerfile: Dockerfile
-    container_name: user-service
-    ports:
-      - "8081:8081"
-    environment:
-      - DB_URL=jdbc:postgresql://postgres:5432/userdb
-      - DB_USERNAME=postgres
-      - DB_PASSWORD=postgres
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_PORT=5672
-      - JWT_SECRET=your-256-bit-secret-key-here-must-be-at-least-32-characters
-      - JWT_EXPIRATION=86400000
-      - EUREKA_URL=http://localhost:8761/eureka/
-      - ZIPKIN_URL=http://localhost:9411
-    depends_on:
-      - postgres
-      - redis
-      - rabbitmq
-    networks:
-      - user-service-network
+  # Các services sẽ chạy local, không cần Docker trong development
+  # user-service:
+  #   build:
+  #     context: ./user-service
+  #     dockerfile: Dockerfile
+  #   container_name: user-service
+  #   ports:
+  #     - "8081:8081"
+  #   environment:
+  #     - DB_URL=jdbc:postgresql://postgres:5432/user_service_db
+  #     - DB_USERNAME=java_admin
+  #     - DB_PASSWORD=admin123
+  #     - REDIS_HOST=redis
+  #     - REDIS_PORT=6379
+  #     - RABBITMQ_HOST=rabbitmq
+  #     - RABBITMQ_PORT=5672
+  #     - JWT_SECRET=your-256-bit-secret-key-here-must-be-at-least-32-characters
+  #     - JWT_EXPIRATION=86400000
+  #     - EUREKA_URL=http://localhost:8761/eureka/
+  #     - ZIPKIN_URL=http://localhost:9411
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #     - rabbitmq
+  #   networks:
+  #     - user-service-network
 
 volumes:
   postgres_data:
+  # learning_postgres_data:  # Khi cần
+  # auth_postgres_data:      # Khi cần
 
 networks:
   user-service-network:
